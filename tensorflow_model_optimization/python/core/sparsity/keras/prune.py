@@ -27,8 +27,13 @@ custom_object_scope = tf.keras.utils.custom_object_scope
 def prune_scope():
   """Provides a scope in which Pruned layers and models can be deserialized.
 
-  If a keras model or layer has been pruned, it needs to be within this scope
-  to be successfully deserialized.
+  For TF 2.X: this is not needed for SavedModel or TF checkpoints, which are
+  the recommended serialization formats.
+
+  For TF 1.X: if a tf.keras h5 model or layer has been pruned, it needs to be
+  within this
+  scope to be successfully deserialized. This is not needed for loading just
+  keras weights.
 
   Returns:
       Object of type `CustomObjectScope` with pruning objects included.
@@ -52,7 +57,7 @@ def prune_low_magnitude(to_prune,
                         block_size=(1, 1),
                         block_pooling_type='AVG',
                         **kwargs):
-  """Modify a keras layer or model to be pruned during training.
+  """Modify a tf.keras layer or model to be pruned during training.
 
   This function wraps a tf.keras model or layer with pruning functionality which
   sparsifies the layer's weights during training. For example, using this with
@@ -60,11 +65,23 @@ def prune_low_magnitude(to_prune,
 
   The function accepts either a single keras layer
   (subclass of `tf.keras.layers.Layer`), list of keras layers or a Sequential
-  or Functional keras model and handles them appropriately.
+  or Functional tf.keras model and handles them appropriately.
 
   If it encounters a layer it does not know how to handle, it will throw an
   error. While pruning an entire model, even a single unknown layer would lead
   to an error.
+
+  Optimizer: this function removes the optimizer. The user is expected to
+  compile the model
+  again, with the default behavior of the step starting at 0, to be compatible
+  with
+  the pruning schedules begin_step and end_step parameters.
+
+  Checkpointing: checkpointing should include the optimizer, not just the
+  weights. Pruning supports
+  checkpointing though
+  upon inspection, the weights of checkpoints are not sparse
+  (https://github.com/tensorflow/model-optimization/issues/206).
 
   Prune a model:
 
@@ -111,7 +128,7 @@ def prune_low_magnitude(to_prune,
         Ignored when to_prune is not a keras layer.
 
   Returns:
-    Layer or model modified with pruning wrappers.
+    Layer or model modified with pruning wrappers. Optimizer is removed.
 
   Raises:
     ValueError: if the keras layer is unsupported, or the keras model contains
